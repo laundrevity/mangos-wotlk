@@ -7343,6 +7343,115 @@ bool ChatHandler::HandleModifyAppearanceCommand(char* args)
     return true;
 }
 
+// .modify transmog <slot> <itemId>   |   .modify transmog reset [slot]
+// Cosmetic item display override: the equipped item in <slot> renders as
+// <itemId> for every viewer. Stats, inventory and saves untouched; relog
+// reverts. Slots: head shoulders shirt chest waist legs feet wrists hands
+// back mainhand offhand ranged tabard.
+bool ChatHandler::HandleModifyTransmogCommand(char* args)
+{
+    Player* player = getSelectedPlayer();
+    if (!player)
+    {
+        PSendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (!*args)
+        return false;
+
+    static const struct { char const* name; uint8 slot; } slotNames[] =
+    {
+        { "head",      EQUIPMENT_SLOT_HEAD },      { "shoulders", EQUIPMENT_SLOT_SHOULDERS },
+        { "shirt",     EQUIPMENT_SLOT_BODY },      { "chest",     EQUIPMENT_SLOT_CHEST },
+        { "waist",     EQUIPMENT_SLOT_WAIST },     { "legs",      EQUIPMENT_SLOT_LEGS },
+        { "feet",      EQUIPMENT_SLOT_FEET },      { "wrists",    EQUIPMENT_SLOT_WRISTS },
+        { "hands",     EQUIPMENT_SLOT_HANDS },     { "back",      EQUIPMENT_SLOT_BACK },
+        { "mainhand",  EQUIPMENT_SLOT_MAINHAND },  { "offhand",   EQUIPMENT_SLOT_OFFHAND },
+        { "ranged",    EQUIPMENT_SLOT_RANGED },    { "tabard",    EQUIPMENT_SLOT_TABARD },
+    };
+
+    auto findSlot = [&](char const* name, uint8& out) -> bool
+    {
+        for (auto const& entry : slotNames)
+            if (!strcmp(name, entry.name))
+            {
+                out = entry.slot;
+                return true;
+            }
+        return false;
+    };
+
+    if (!strncmp(args, "reset", 5))
+    {
+        args += 5;
+        char* slotStr = ExtractLiteralArg(&args);
+        uint8 slot;
+        if (slotStr && findSlot(slotStr, slot))
+        {
+            player->ClearTransmog(slot);
+            PSendSysMessage("Transmog cleared on %s's %s.", player->GetName(), slotStr);
+        }
+        else
+        {
+            player->ClearTransmogs();
+            PSendSysMessage("All transmogs cleared on %s.", player->GetName());
+        }
+        return true;
+    }
+
+    char* slotStr = ExtractLiteralArg(&args);
+    uint8 slot;
+    if (!slotStr || !findSlot(slotStr, slot))
+    {
+        SendSysMessage("Unknown slot. Use: head shoulders shirt chest waist legs feet wrists hands back mainhand offhand ranged tabard.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    char* valStr = ExtractLiteralArg(&args);
+    if (!valStr)
+        return false;
+
+    if (!strcmp(valStr, "hide"))
+    {
+        player->SetTransmog(slot, 0);
+        PSendSysMessage("%s's %s is now hidden. \".modify transmog reset %s\" restores.",
+                        player->GetName(), slotStr, slotStr);
+        return true;
+    }
+
+    uint32 itemId = atoi(valStr);
+    if (!itemId)
+        return false;
+
+    ItemPrototype const* proto = ObjectMgr::GetItemPrototype(itemId);
+    if (!proto)
+    {
+        PSendSysMessage(LANG_COMMAND_ITEMIDINVALID, itemId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+    if (proto->InventoryType == INVTYPE_NON_EQUIP)
+    {
+        PSendSysMessage("Item %u is not equippable — nothing to display.", itemId);
+        SetSentErrorMessage(true);
+        return false;
+    }
+    if (!player->GetItemByPos(INVENTORY_SLOT_BAG_0, slot))
+    {
+        PSendSysMessage("%s has nothing equipped in %s — equip something to transmog it.", player->GetName(), slotStr);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    player->SetTransmog(slot, itemId);
+    PSendSysMessage("%s's %s now displays as %s (item %u). Relog reverts; \".modify transmog reset\" restores.",
+                    player->GetName(), slotStr, proto->Name1, itemId);
+    return true;
+}
+
 bool ChatHandler::HandleModifyGenderCommand(char* args)
 {
     if (!*args)

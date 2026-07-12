@@ -11852,7 +11852,11 @@ void Player::SetVisibleItemSlot(uint8 slot, Item* pItem)
 {
     if (pItem)
     {
-        SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), pItem->GetEntry());
+        // ".modify transmog" illusion: show the override entry instead of the
+        // equipped item (display-layer only; the real item is untouched)
+        auto transmog = m_transmogOverrides.find(slot);
+        SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2),
+                       transmog != m_transmogOverrides.end() ? transmog->second : pItem->GetEntry());
         SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 0, pItem->GetEnchantmentId(PERM_ENCHANTMENT_SLOT));
         SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 1, pItem->GetEnchantmentId(TEMP_ENCHANTMENT_SLOT));
     }
@@ -11861,6 +11865,26 @@ void Player::SetVisibleItemSlot(uint8 slot, Item* pItem)
         SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), 0);
         SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 0);
     }
+}
+
+void Player::SetTransmog(uint8 slot, uint32 itemEntry)
+{
+    // itemEntry 0 = hide the slot (visible entry 0 renders nothing)
+    m_transmogOverrides[slot] = itemEntry;
+    SetVisibleItemSlot(slot, GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+}
+
+void Player::ClearTransmog(uint8 slot)
+{
+    m_transmogOverrides.erase(slot);
+    SetVisibleItemSlot(slot, GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
+}
+
+void Player::ClearTransmogs()
+{
+    m_transmogOverrides.clear();
+    for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
+        SetVisibleItemSlot(slot, GetItemByPos(INVENTORY_SLOT_BAG_0, slot));
 }
 
 void Player::VisualizeItem(uint8 slot, Item* pItem)
@@ -20561,6 +20585,37 @@ void Player::SetAppearanceOverride(uint8 race, uint8 gender)
     SetUInt32Value(PLAYER_BYTES_2, m_trueBytes2 & 0xFFFFFF00);  // facial feature 0, keep rest bits
     SetDisplayId(displayId);
     SetNativeDisplayId(displayId);
+
+    // the 3.3.5a client refuses to send chat in a language the character
+    // doesn't know — server-side fallbacks never see the message. The
+    // default chat tongue is the fake race's FACTION language (Orcish /
+    // Common), not its racial one, so a cross-faction disguise needs both.
+    uint32 const factionTongue = (race == RACE_ORC || race == RACE_UNDEAD || race == RACE_TAUREN ||
+                                  race == RACE_TROLL || race == RACE_BLOODELF) ? 669u : 668u;
+    for (uint32 langSpell : { factionTongue, NativeLanguageSpell(race) })
+        if (langSpell && !HasSpell(langSpell))
+        {
+            learnSpell(langSpell, false);
+            m_grantedLangSpells.push_back(langSpell);
+        }
+}
+
+uint32 Player::NativeLanguageSpell(uint8 race)
+{
+    switch (race)
+    {
+        case RACE_HUMAN:    return 668;    // Common
+        case RACE_ORC:      return 669;    // Orcish
+        case RACE_DWARF:    return 672;    // Dwarven
+        case RACE_NIGHTELF: return 671;    // Darnassian
+        case RACE_UNDEAD:   return 17737;  // Gutterspeak
+        case RACE_TAUREN:   return 670;    // Taurahe
+        case RACE_GNOME:    return 7340;   // Gnomish
+        case RACE_TROLL:    return 7341;   // Troll
+        case RACE_BLOODELF: return 813;    // Thalassian
+        case RACE_DRAENEI:  return 29932;  // Draenei
+        default:            return 0;
+    }
 }
 
 void Player::ClearAppearanceOverride()
@@ -20574,6 +20629,9 @@ void Player::ClearAppearanceOverride()
     SetUInt32Value(PLAYER_BYTES, m_trueBytes);
     SetUInt32Value(PLAYER_BYTES_2, m_trueBytes2);
     m_appearanceOverride = false;
+    for (uint32 langSpell : m_grantedLangSpells)
+        removeSpell(langSpell);
+    m_grantedLangSpells.clear();
     InitDisplayIds();
 }
 

@@ -2068,11 +2068,19 @@ class Player : public Unit
         // TRUE identity (a persisted fake race/class pair fails login).
         void SetAppearanceOverride(uint8 race, uint8 gender);
         void ClearAppearanceOverride();
+        static uint32 NativeLanguageSpell(uint8 race);
         bool HasAppearanceOverride() const { return m_appearanceOverride; }
         uint8 getSaveRace() const { return m_appearanceOverride ? m_trueRace : getRace(); }
         uint8 getSaveGender() const { return m_appearanceOverride ? m_trueGender : getGender(); }
         uint32 GetSavePlayerBytes() const { return m_appearanceOverride ? m_trueBytes : GetUInt32Value(PLAYER_BYTES); }
         uint32 GetSavePlayerBytes2() const { return m_appearanceOverride ? m_trueBytes2 : GetUInt32Value(PLAYER_BYTES_2); }
+
+        // Cosmetic per-slot item display override (".modify transmog"):
+        // rewrites only the PLAYER_VISIBLE_ITEM entry field, so inventory,
+        // stats and saves are untouched. RAM-only — relog reverts.
+        void SetTransmog(uint8 slot, uint32 itemEntry);     // itemEntry 0 hides the slot
+        void ClearTransmog(uint8 slot);
+        void ClearTransmogs();
 
         bool IsAtGroupRewardDistance(WorldObject const* pRewardSource) const;
         void RewardSinglePlayerAtKill(Unit* pVictim);
@@ -2856,6 +2864,11 @@ class Player : public Unit
         uint8 m_trueGender = 0;
         uint32 m_trueBytes = 0;
         uint32 m_trueBytes2 = 0;
+
+        // transmog overrides (cosmetic; never persisted): slot -> shown item entry
+        std::map<uint8, uint32> m_transmogOverrides;
+        // language spells taught for the disguise's fake race
+        std::vector<uint32> m_grantedLangSpells;
 
         uint32 m_zoneUpdateId;
         uint32 m_zoneUpdateTimer;

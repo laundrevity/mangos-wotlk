@@ -520,6 +520,7 @@ ChatCommand* ChatHandler::getCommandTable()
         { "phase",          SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyPhaseCommand,         "", nullptr },
         { "gender",         SEC_GAMEMASTER,     false, &ChatHandler::HandleModifyGenderCommand,        "", nullptr },
         { "appearance",     SEC_GAMEMASTER,     false, &ChatHandler::HandleModifyAppearanceCommand,    "", nullptr },
+        { "transmog",       SEC_GAMEMASTER,     false, &ChatHandler::HandleModifyTransmogCommand,      "", nullptr },
         { "strength",       SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyStrengthCommand,      "", nullptr },
         { "agility",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyAgilityCommand,       "", nullptr },
         { "stamina",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyStaminaCommand,       "", nullptr },
