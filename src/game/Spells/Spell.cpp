@@ -25,6 +25,7 @@
 #include "Server/Opcodes.h"
 #include "Log/Log.h"
 #include "World/World.h"
+#include "Combat/CombatEventLog.h"
 #include "Globals/ObjectMgr.h"
 #include "Spells/SpellMgr.h"
 #include "Entities/Player.h"
@@ -3412,6 +3413,9 @@ void Spell::Prepare()
         // will show cast bar
         SendSpellStart();
 
+        if (sCombatEventLog.IsEnabled() && m_caster)
+            sCombatEventLog.LogCastStart(m_caster, m_targets.getUnitTarget(), m_spellInfo, m_casttime);
+
         // Execute instant spells immediate
         if (m_timer == 0 && !IsNextMeleeSwingSpell(m_spellInfo) && (!IsAutoRepeat() || m_triggerAutorepeat))
             cast();
@@ -3435,6 +3439,10 @@ void Spell::cancel()
 {
     if (m_spellState == SPELL_STATE_FINISHED)
         return;
+
+    // covers kicks, movement/user cancels and death; "st" tells mid-cast from post-cast
+    if (sCombatEventLog.IsEnabled() && !m_IsTriggeredSpell && m_caster)
+        sCombatEventLog.LogCastCancel(m_caster, m_targets.getUnitTargetGuid(), m_spellInfo, m_spellState);
 
     // channeled spells don't display interrupted message even if they are interrupted, possible other cases with no "Interrupted" message
     bool sendInterrupt = !(IsChanneledSpell(m_spellInfo) || m_autoRepeat);
@@ -4295,6 +4303,9 @@ void Spell::finish(bool ok)
     // other code related only to successfully finished spells
     if (!ok)
         return;
+
+    if (sCombatEventLog.IsEnabled() && !m_IsTriggeredSpell && m_caster)
+        sCombatEventLog.LogCastSuccess(m_caster, m_targets.getUnitTargetGuid(), m_spellInfo);
 
     // Heal caster for all health leech from all targets
     if (m_healthLeech)

@@ -403,15 +403,12 @@ if(BUILD_GAME_SERVER OR BUILD_LOGIN_SERVER OR BUILD_EXTRACTORS)
 endif()
 
 if(BUILD_EXTRACTORS)
-  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
-  set(BUILD_EXTRACTORS, OFF)
-  message(STATUS "BUILD_EXTRACTORS forced to OFF.  Not supported on ARM architecture")
-  else()
-    add_subdirectory(contrib/extractor)
-    add_subdirectory(contrib/vmap_extractor)
-    add_subdirectory(contrib/vmap_assembler)
-    add_subdirectory(contrib/mmap)
-  endif()
+  # stale 32-bit-ARM gate removed: extractors build and run fine on arm64
+  # (Apple Silicon) — same fix as mangos-tbc local-patches
+  add_subdirectory(contrib/extractor)
+  add_subdirectory(contrib/vmap_extractor)
+  add_subdirectory(contrib/vmap_assembler)
+  add_subdirectory(contrib/mmap)
 endif()
 
 if(BUILD_DOCS)

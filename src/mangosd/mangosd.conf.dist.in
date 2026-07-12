@@ -322,6 +322,27 @@ MaxWhoListReturns = 49
 #        Example:     "World.pkt" - (Enabled)
 #        Default:     ""          - (Disabled)
 #
+#    CombatEventLog.Enable
+#        Description: JSONL combat event log (one JSON object per line) for offline
+#                     analysis. One file per server boot with the boot timestamp
+#                     inserted before the extension. Writes are buffered.
+#        Default:     0 - (Disabled)
+#                     1 - (Enabled)
+#
+#    CombatEventLog.File
+#        Description: Base filename of the combat event log. A relative name is
+#                     placed inside LogsDir (like the other log files); an absolute
+#                     path is used as-is.
+#        Default:     "combat_events.jsonl"
+#
+#    CombatEventLog.Scope
+#        Description: Which events are kept.
+#        Default:     0 - only events involving a real (non-bot) player, their
+#                         group (playerbots included), their pets, or units
+#                         currently engaged with that group
+#                     1 - all events on instanceable maps (dungeons/raids/arenas)
+#                     2 - everything (a firehose with many random bots; debug only)
+#
 #    LogTimestamp
 #        Logfile with timestamp of server start in name
 #        Default: 0 - no timestamp in name
@@ -430,6 +451,9 @@ LogLevel = 1
 LogTime = 0
 LogFile = "Server.log"
 PacketLogFile = ""
+CombatEventLog.Enable = 0
+CombatEventLog.File = "combat_events.jsonl"
+CombatEventLog.Scope = 0
 LogTimestamp = 0
 LogFileLevel = 0
 LogFilter_AchievementUpdates = 1

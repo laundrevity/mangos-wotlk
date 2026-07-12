@@ -28,8 +28,10 @@ if(BUILD_PLAYERBOTS)
   FetchContent_Declare(
     PlayerBots
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/modules/PlayerBots"
-    GIT_REPOSITORY "https://github.com/cmangos/playerbots.git"
-    GIT_TAG "master"
+    # pinned to the laundrevity fork: an absent module dir must NEVER
+    # silently build vanilla upstream (bot-brains executor lives there)
+    GIT_REPOSITORY "https://github.com/laundrevity/playerbots.git"
+    GIT_TAG "local-patches"
   )
 
   FetchContent_GetProperties(PlayerBots)

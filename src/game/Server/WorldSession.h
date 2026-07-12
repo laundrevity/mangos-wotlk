@@ -309,6 +309,7 @@ class WorldSession
         const std::string GetRemoteAddress() const { return m_socket ? m_socket->GetRemoteAddress() : "disconnected"; }
 #endif
         const std::string& GetLocalAddress() const { return m_localAddress; }
+        bool HasSocket() const { return bool(m_socket); }   // sessions without a socket are bots (or linkdead)
 
         void SetPlayer(Player* plr, uint32 playerGuid);
         uint8 GetExpansion() const { return m_expansion; }

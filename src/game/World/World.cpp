@@ -42,6 +42,7 @@
 #include "Spells/SpellMgr.h"
 #include "Chat/Chat.h"
 #include "Server/DBCStores.h"
+#include "Combat/CombatEventLog.h"
 #include "Mails/MassMailMgr.h"
 #include "Loot/LootMgr.h"
 #include "Entities/ItemEnchantmentMgr.h"
@@ -178,6 +179,7 @@ void World::CleanupsBeforeStop()
     UpdateSessions(1);                               // real players unload required UpdateSessions call
     sBattleGroundMgr.DeleteAllBattleGrounds();       // unload battleground templates before different singletons destroyed
     sMapMgr.UnloadAll();                             // unload all grids (including locked in memory)
+    sCombatEventLog.Shutdown();                      // final combat-event flush + close
 }
 
 /// Find a session by its id
@@ -1590,6 +1592,9 @@ void World::SetInitialWorldSettings()
 #endif
 #endif
 
+    sCombatEventLog.Initialize();
+    sLog.outString();
+
     sLog.outString("---------------------------------------");
     sLog.outString("      CMANGOS: World initialized       ");
     sLog.outString("---------------------------------------");
@@ -1835,6 +1840,14 @@ void World::Update(uint32 diff)
         GeneratePacketMetrics();
     }
 #endif
+
+    // CombatEventLog: interval flush + 1 Hz real-player power snapshots
+    // (bot sessions are not in m_sessions; LogPower also filters internally)
+    if (sCombatEventLog.Update(diff))
+        for (SessionMap::const_iterator itr = m_sessions.begin(); itr != m_sessions.end(); ++itr)
+            if (WorldSession* session = itr->second)
+                if (Player* player = session->GetPlayer())
+                    sCombatEventLog.LogPower(player);
 
     /// </ul>
     ///- Move all creatures with "delayed move" and remove and delete all objects with "delayed remove"
