@@ -928,22 +928,30 @@ void WorldSession::HandleBattlemasterJoinArena(WorldPacket& recv_data)
     info.mapId = bg->GetMapId();
     if (asGroup)
     {
-        for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
+        // a failed precheck must abort the join outright: posting AddGroup
+        // anyway creates a queue-side-only ("phantom") group whose members
+        // never receive player-side queue slots, so they can never accept —
+        // rated opponents then match the phantom and the arena starts empty
+        // (observed as recurring 2v0 matches)
+        if (err <= BG_GROUP_JOIN_STATUS_BATTLEGROUND_FAIL)
         {
-            if (Player* member = itr->getSource())
+            sLog.outError("BattlegroundHandler: arena group join by %s rejected by precheck (err %d), not queueing.",
+                          _player->GetName(), int32(err));
+            for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
             {
-                WorldPacket data;
-
-                if (err <= BG_GROUP_JOIN_STATUS_BATTLEGROUND_FAIL)
+                if (Player* member = itr->getSource())
                 {
+                    WorldPacket data;
                     sBattleGroundMgr.BuildGroupJoinedBattlegroundPacket(data, err);
                     member->GetSession()->SendPacket(data);
-                    continue;
                 }
-
-                info.members.push_back(member->GetObjectGuid());
             }
+            return;
         }
+
+        for (GroupReference* itr = group->GetFirstMember(); itr != nullptr; itr = itr->next())
+            if (Player* member = itr->getSource())
+                info.members.push_back(member->GetObjectGuid());
     }
 
     sWorld.GetBGQueue().GetMessager().AddMessage([playerGuid = _player->GetObjectGuid(), bgQueueTypeId, bgTypeId, bgBracketId, ateamId, asGroup, isRated, arenaTeamId = _player->GetArenaTeamId(arenaslot), playerName = _player->GetName(), info, arenaRating, arenatype, err](BattleGroundQueue* queue)
