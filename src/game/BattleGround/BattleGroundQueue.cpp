@@ -955,9 +955,10 @@ void BattleGroundQueueItem::Update(BattleGroundQueue& queue, BattleGroundTypeId 
 
     auto pickRandomArena = [&](BattleGroundTypeId& bgTypeId, BattleGround*& bgTemplate)
     {
-        // Ring of Valor removed from the rotation: its start elevators strand
-        // every participant under the arena floor (known-broken; local call)
-        BattleGroundTypeId arenas[] = { BATTLEGROUND_NA, BATTLEGROUND_BE, BATTLEGROUND_RL, BATTLEGROUND_DS };
+        // RoV and Dalaran Sewers removed from the rotation: RoV's elevators
+        // strand everyone under the floor, DS needs a jump-down from the start
+        // pipes that bot pathing won't take. TBC-proven trio until fixed.
+        BattleGroundTypeId arenas[] = { BATTLEGROUND_NA, BATTLEGROUND_BE, BATTLEGROUND_RL };
         bgTypeId = arenas[urand(0, countof(arenas) - 1)];
         bgTemplate = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
         if (!bgTemplate)
