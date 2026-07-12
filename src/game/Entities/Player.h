@@ -875,6 +875,7 @@ enum PlayerDelayedOperations
     DELAYED_SPELL_CAST_DESERTER = 0x04,
     DELAYED_BG_MOUNT_RESTORE    = 0x08,                     ///< Flag to restore mount state after teleport from BG
     DELAYED_BG_TAXI_RESTORE     = 0x10,                     ///< Flag to restore taxi state after teleport from BG
+    DELAYED_BG_TELEPORT         = 0x20,                     ///< finish an accepted BG/arena port once the current teleport resolves
     DELAYED_END
 };
 
@@ -2061,6 +2062,18 @@ class Player : public Unit
 
         void InitDisplayIds();
 
+        // Cosmetic appearance override (".modify appearance"): the client
+        // composites player looks from BYTES_0 race/gender + PLAYER_BYTES,
+        // so the illusion flips those fields at runtime. SaveToDB writes the
+        // TRUE identity (a persisted fake race/class pair fails login).
+        void SetAppearanceOverride(uint8 race, uint8 gender);
+        void ClearAppearanceOverride();
+        bool HasAppearanceOverride() const { return m_appearanceOverride; }
+        uint8 getSaveRace() const { return m_appearanceOverride ? m_trueRace : getRace(); }
+        uint8 getSaveGender() const { return m_appearanceOverride ? m_trueGender : getGender(); }
+        uint32 GetSavePlayerBytes() const { return m_appearanceOverride ? m_trueBytes : GetUInt32Value(PLAYER_BYTES); }
+        uint32 GetSavePlayerBytes2() const { return m_appearanceOverride ? m_trueBytes2 : GetUInt32Value(PLAYER_BYTES_2); }
+
         bool IsAtGroupRewardDistance(WorldObject const* pRewardSource) const;
         void RewardSinglePlayerAtKill(Unit* pVictim);
         void RewardPlayerAndGroupAtEventCredit(uint32 creature_id, WorldObject* pRewardSource);
@@ -2279,6 +2292,13 @@ class Player : public Unit
         }
 
         WorldLocation const& GetBattleGroundEntryPoint() const { return m_bgData.joinPos; }
+        // joinPos is all-zero when it was never captured this session (e.g. a relog
+        // between queue join and port accept) - teleporting there lands at the map-0 origin
+        bool HasValidBattleGroundEntryPoint() const
+        {
+            return !(m_bgData.joinPos.mapid == 0 && m_bgData.joinPos.coord_x == 0.0f &&
+                     m_bgData.joinPos.coord_y == 0.0f && m_bgData.joinPos.coord_z == 0.0f);
+        }
         void SetBattleGroundEntryPoint();
 
         void SetBGTeam(Team team) { m_bgData.bgTeam = team; m_bgData.m_needSave = true; }
@@ -2829,6 +2849,13 @@ class Player : public Unit
         bool   m_MonthlyQuestChanged;
 
         uint32 m_drunkTimer;
+
+        // appearance override (cosmetic; never persisted)
+        bool m_appearanceOverride = false;
+        uint8 m_trueRace = 0;
+        uint8 m_trueGender = 0;
+        uint32 m_trueBytes = 0;
+        uint32 m_trueBytes2 = 0;
 
         uint32 m_zoneUpdateId;
         uint32 m_zoneUpdateTimer;

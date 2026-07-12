@@ -459,6 +459,7 @@ class ChatHandler
         bool HandleModifyArenaCommand(char* args);
         bool HandleModifyPhaseCommand(char* args);
         bool HandleModifyGenderCommand(char* args);
+        bool HandleModifyAppearanceCommand(char* args);
         bool HandleModifyStrengthCommand(char* args);
         bool HandleModifyAgilityCommand(char* args);
         bool HandleModifyStaminaCommand(char* args);

@@ -1131,6 +1131,11 @@ bool PathFinder::HaveTile(const Vector3& p) const
     if (m_sourceUnit && m_sourceUnit->GetTransport())
         return true;
 
+    // maps without mmaps (or a failed load) leave the mesh null; a chasing
+    // unit then segfaulted in dtNavMesh::getTileAt (gdb-caught live on a bg)
+    if (!m_navMesh)
+        return false;
+
     int tx = -1, ty = -1;
     float point[VERTEX_SIZE] = {p.y, p.z, p.x};
 

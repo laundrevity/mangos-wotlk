@@ -759,8 +759,13 @@ void ElevatorTransport::SetGoState(GOState state)
 
 void GenericTransport::UpdatePassengerPositions(PassengerSet& passengers)
 {
-    for (const auto passenger : passengers)
-        UpdatePassengerPosition(passenger);
+    // Iterate a snapshot: relocation side effects (AI reactions, scripts,
+    // despawns, teleports) can call RemovePassenger and mutate the live set
+    // mid-loop, invalidating the range-for iterator (SEGV in the tree walk).
+    std::vector<WorldObject*> snapshot(passengers.begin(), passengers.end());
+    for (WorldObject* passenger : snapshot)
+        if (passengers.find(passenger) != passengers.end())
+            UpdatePassengerPosition(passenger);
 }
 
 void GenericTransport::UpdatePassengerPosition(WorldObject* passenger)

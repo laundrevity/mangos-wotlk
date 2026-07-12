@@ -117,8 +117,17 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         }
         if (!foundAura)
         {
-            SendNotification(LANG_NOT_LEARNED_LANGUAGE);
-            return;
+            // appearance override: the client derives the chat language from
+            // the FAKE race's bytes (e.g. Thalassian for a disguised orc) and
+            // would lock the player out of all chat AND dot-commands. Fall
+            // back to universal instead of rejecting.
+            if (_player->HasAppearanceOverride())
+                lang = LANG_UNIVERSAL;
+            else
+            {
+                SendNotification(LANG_NOT_LEARNED_LANGUAGE);
+                return;
+            }
         }
     }
 

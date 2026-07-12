@@ -121,9 +121,14 @@ enum BattleGroundSpells : uint32
     SPELL_BATTLEGROUND_DAMPENING    = 74411,                // Battleground - Dampening
 };
 
+// max 3D distance from both team start locations before an in-progress arena
+// participant counts as out of bounds (arena floors stay within ~120 yd of a gate)
+float const ARENA_MAX_DIST_FROM_START = 200.0f;
+
 enum BattleGroundTimeIntervals
 {
     CHECK_PLAYER_POSITION_INVERVAL  = 1000,                 // ms
+    ARENA_BOUNDS_CHECK_INTERVAL     = 5000,                 // ms
     RESURRECTION_INTERVAL           = 30000,                // ms
     INVITATION_REMIND_TIME          = 20000,                // ms
     INVITE_ACCEPT_WAIT_TIME         = 60000,                // ms
@@ -699,6 +704,7 @@ class BattleGround
         uint32 m_clientInstanceId;                          // the instance-id which is sent to the client and without any other internal use
         uint32 m_startTime;
         uint32 m_validStartPositionTimer;
+        uint32 m_arenaBoundsCheckTimer;
         uint32 m_prematureCountDownTimer;
         int32 m_endTime;                                    // it is set to 120000 when bg is ending and it decreases itself
         int32  m_startDelayTime;

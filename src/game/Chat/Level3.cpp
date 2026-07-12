@@ -7293,6 +7293,56 @@ bool ChatHandler::HandleArenaTeamPointSet(char* args)
     return true;
 }
 
+// .modify appearance <race 1-11> <male|female>   |   .modify appearance reset
+// Cosmetic tmorph-style illusion: model, skin AND armor render as the fake
+// race/gender for every viewer. Runtime-only (relog reverts; saves keep the
+// true identity — see Player::SetAppearanceOverride).
+bool ChatHandler::HandleModifyAppearanceCommand(char* args)
+{
+    Player* player = getSelectedPlayer();
+    if (!player)
+    {
+        PSendSysMessage(LANG_PLAYER_NOT_FOUND);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (!*args)
+        return false;
+
+    if (!strncmp(args, "reset", 5))
+    {
+        player->ClearAppearanceOverride();
+        PSendSysMessage("Appearance restored to %s's true identity.", player->GetName());
+        return true;
+    }
+
+    uint32 race;
+    if (!ExtractUInt32(&args, race) || race < RACE_HUMAN || race > RACE_DRAENEI)
+        return false;
+
+    char* genderStr = ExtractLiteralArg(&args);
+    if (!genderStr)
+        return false;
+
+    uint8 gender;
+    if (!strncmp(genderStr, "male", strlen(genderStr)))
+        gender = GENDER_MALE;
+    else if (!strncmp(genderStr, "female", strlen(genderStr)))
+        gender = GENDER_FEMALE;
+    else
+    {
+        SendSysMessage(LANG_MUST_MALE_OR_FEMALE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    player->SetAppearanceOverride(uint8(race), gender);
+    PSendSysMessage("Appearance of %s overridden (race %u, %s). Relog reverts; \".modify appearance reset\" restores.",
+                    player->GetName(), race, gender == GENDER_FEMALE ? "female" : "male");
+    return true;
+}
+
 bool ChatHandler::HandleModifyGenderCommand(char* args)
 {
     if (!*args)

@@ -1341,7 +1341,7 @@ bool BgQueueRemoveEvent::Execute(uint64 /*e_time*/, uint32 /*p_time*/)
                 BattleGroundQueueItem& bgQueue = queue->m_battleGroundQueues[bgQueueTypeId];
                 if (bgQueue.IsPlayerInvited(playerGuid, instanceGuid, removeTime))
                 {
-                    DEBUG_LOG("Battleground: removing player %u from bg queue for instance %u because of not pressing enter battle in time.", playerGuid.GetCounter(), instanceGuid);
+                    sLog.outError("Battleground: removing player %u from bg queue for instance %u because of not pressing enter battle in time.", playerGuid.GetCounter(), instanceGuid);
 
                     bgQueue.RemovePlayer(*queue, playerGuid, true);
 

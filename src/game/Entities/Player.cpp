@@ -2417,6 +2417,11 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
 
 bool Player::TeleportToBGEntryPoint()
 {
+    // never teleport to an uninitialized (all-zero) entry point: recapture from the
+    // current position, which itself falls back to the homebind when not usable
+    if (!HasValidBattleGroundEntryPoint())
+        SetBattleGroundEntryPoint();
+
     ScheduleDelayedOperation(DELAYED_BG_MOUNT_RESTORE);
     ScheduleDelayedOperation(DELAYED_BG_TAXI_RESTORE);
     return TeleportTo(m_bgData.joinPos);
@@ -2461,6 +2466,34 @@ void Player::ProcessDelayedOperations()
 
     if (m_DelayedOperations & DELAYED_BG_TAXI_RESTORE)
         TaxiFlightResume();
+
+    if (m_DelayedOperations & DELAYED_BG_TELEPORT)
+    {
+        // port was accepted while this player was mid-teleport or still logging in; finish it now
+        if (uint32 bgInstanceId = GetBattleGroundId())
+        {
+            m_DelayedOperations = 0; // clear before teleporting so the next ack doesn't re-run this
+
+            if (sBattleGroundMgr.GetBattleGround(bgInstanceId, GetBattleGroundTypeId()))
+            {
+                if (!IsAlive())
+                {
+                    ResurrectPlayer(1.0f);
+                    SpawnCorpseBones();
+                }
+
+                sBattleGroundMgr.SendToBattleGround(this, bgInstanceId, GetBattleGroundTypeId());
+            }
+            else
+            {
+                // the match ended (or the instance died) before this player ever arrived:
+                // drop the stale membership instead of porting into nothing
+                sLog.outError("DELAYED_BG_TELEPORT: bg instance %u gone before %s arrived, clearing stale membership.",
+                              bgInstanceId, GetGuidStr().c_str());
+                SetBattleGroundId(0, BATTLEGROUND_TYPE_NONE);
+            }
+        }
+    }
 
     // we have executed ALL delayed ops, so clear the flag
     m_DelayedOperations = 0;
@@ -18311,14 +18344,14 @@ void Player::SaveToDB()
     uberInsert.addUInt32(GetGUIDLow());
     uberInsert.addUInt32(GetSession()->GetAccountId());
     uberInsert.addString(m_name);
-    uberInsert.addUInt8(getRace());
+    uberInsert.addUInt8(getSaveRace());                 // appearance override never persists
     uberInsert.addUInt8(getClass());
-    uberInsert.addUInt8(getGender());
+    uberInsert.addUInt8(getSaveGender());
     uberInsert.addUInt32(GetLevel());
     uberInsert.addUInt32(GetUInt32Value(PLAYER_XP));
     uberInsert.addUInt32(GetMoney());
-    uberInsert.addUInt32(GetUInt32Value(PLAYER_BYTES));
-    uberInsert.addUInt32(GetUInt32Value(PLAYER_BYTES_2));
+    uberInsert.addUInt32(GetSavePlayerBytes());
+    uberInsert.addUInt32(GetSavePlayerBytes2());
     uberInsert.addUInt32(GetUInt32Value(PLAYER_FLAGS));
 
     if (!IsBeingTeleported())
@@ -20482,6 +20515,66 @@ void Player::InitDataForForm(bool reapplyMods)
 
     UpdateAttackPowerAndDamage();
     UpdateAttackPowerAndDamage(true);
+}
+
+// native player model per race/gender (client-baked; PlayerInfo can't be
+// used here: the override may form pairs like blood elf shaman that have
+// no playercreateinfo row)
+static uint32 NativePlayerDisplayId(uint8 race, uint8 gender)
+{
+    bool female = gender == GENDER_FEMALE;
+    switch (race)
+    {
+        case RACE_HUMAN:    return female ? 50 : 49;
+        case RACE_ORC:      return female ? 52 : 51;
+        case RACE_DWARF:    return female ? 54 : 53;
+        case RACE_NIGHTELF: return female ? 56 : 55;
+        case RACE_UNDEAD:   return female ? 58 : 57;
+        case RACE_TAUREN:   return female ? 60 : 59;
+        case RACE_GNOME:    return female ? 1564 : 1563;
+        case RACE_TROLL:    return female ? 1479 : 1478;
+        case RACE_BLOODELF: return female ? 15475 : 15476;
+        case RACE_DRAENEI:  return female ? 16126 : 16125;
+        default:            return 0;
+    }
+}
+
+void Player::SetAppearanceOverride(uint8 race, uint8 gender)
+{
+    uint32 displayId = NativePlayerDisplayId(race, gender);
+    if (!displayId)
+        return;
+
+    if (!m_appearanceOverride)
+    {
+        m_trueRace = getRace();
+        m_trueGender = getGender();
+        m_trueBytes = GetUInt32Value(PLAYER_BYTES);
+        m_trueBytes2 = GetUInt32Value(PLAYER_BYTES_2);
+        m_appearanceOverride = true;
+    }
+
+    SetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_RACE, race);
+    SetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_GENDER, gender);
+    SetUInt16Value(PLAYER_BYTES_3, 0, uint16(gender) | (GetDrunkValue() & 0xFFFE));
+    SetUInt32Value(PLAYER_BYTES, 0);                            // skin/face/hair 0: valid for every race
+    SetUInt32Value(PLAYER_BYTES_2, m_trueBytes2 & 0xFFFFFF00);  // facial feature 0, keep rest bits
+    SetDisplayId(displayId);
+    SetNativeDisplayId(displayId);
+}
+
+void Player::ClearAppearanceOverride()
+{
+    if (!m_appearanceOverride)
+        return;
+
+    SetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_RACE, m_trueRace);
+    SetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_GENDER, m_trueGender);
+    SetUInt16Value(PLAYER_BYTES_3, 0, uint16(m_trueGender) | (GetDrunkValue() & 0xFFFE));
+    SetUInt32Value(PLAYER_BYTES, m_trueBytes);
+    SetUInt32Value(PLAYER_BYTES_2, m_trueBytes2);
+    m_appearanceOverride = false;
+    InitDisplayIds();
 }
 
 void Player::InitDisplayIds()

@@ -120,12 +120,12 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult* dummy, SqlQueryH
 
     WorldSession* masterSession = masterAccount ? sWorld.FindSession(masterAccount) : NULL;
     uint32 botAccountId = lqh->GetAccountId();
-    WorldSession* botSession = new WorldSession(botAccountId, NULL, SEC_PLAYER, 2, 0, LOCALE_enUS, "", 0, 0, false);
-    botSession->SetNoAnticheat();
-
     // has bot already been added?
     if (sObjectMgr.GetPlayer(lqh->GetGuid(), false))
         return;
+
+    WorldSession* botSession = new WorldSession(botAccountId, NULL, SEC_PLAYER, 2, 0, LOCALE_enUS, "", 0, 0, false);
+    botSession->SetNoAnticheat();
 
     uint32 guid = lqh->GetGuid().GetRawValue();
 
@@ -134,7 +134,10 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult* dummy, SqlQueryH
     Player* bot = botSession->GetPlayer();
     if (!bot)
     {
+        if (masterSession)
+            ChatHandler(masterSession).PSendSysMessage("Bot with guid %u failed to log in", guid);
         sLog.outError("Error logging in bot %d, please try to reset all random bots", guid);
+        delete botSession;
         return;
     }
 
@@ -845,6 +848,13 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
 
         sLog.outError("HandlePlayerLogin> LoadFromDB failed to load %s, AccountId = %u", pCurrChar->GetGuidStr().c_str(), GetAccountId());
 
+        // Detach the half-initialized player from the session and destroy it.
+        // Anything that finds it attached later (playerbot login callback,
+        // LogoutAllBots -> SaveToDB) would persist its zeroed fields over the
+        // real character row.
+        SetPlayer(nullptr, playerGuid);
+        delete pCurrChar;
+
         WorldPacket data(SMSG_CHARACTER_LOGIN_FAILED, 1);
         data << (uint8)CHAR_LOGIN_NO_CHARACTER;
         SendPacket(data);
@@ -1092,6 +1102,12 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         pCurrChar->SetStandState(UNIT_STAND_STATE_STAND);
 
     m_playerLoading = false;
+
+    // an arena/BG port accepted while this character was still logging in scheduled
+    // DELAYED_BG_TELEPORT, but delayed operations otherwise only run on teleport acks,
+    // which a fresh login never sends - run them now or the accepted port is silently
+    // lost and the match plays a man down
+    pCurrChar->ProcessDelayedOperations();
 
     // Handle Login-Achievements (should be handled after loading)
     pCurrChar->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ON_LOGIN, 1);

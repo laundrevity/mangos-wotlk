@@ -1394,7 +1394,7 @@ void Map::GameObjectRelocation(GameObject* go, float x, float y, float z, float 
 
     if (old_cell.DiffGrid(new_cell))
     {
-        if (!go->isActiveObject() && !loaded(new_cell.gridPair()))
+        if ((!go->isActiveObject() || m_isUnloading) && !loaded(new_cell.gridPair()))
         {
             DEBUG_FILTER_LOG(LOG_FILTER_CREATURE_MOVES, "Creature (GUID: %u Entry: %u) attempt move from grid[%u,%u]cell[%u,%u] to unloaded grid[%u,%u]cell[%u,%u].", go->GetGUIDLow(), go->GetEntry(), old_cell.GridX(), old_cell.GridY(), old_cell.CellX(), old_cell.CellY(), new_cell.GridX(), new_cell.GridY(), new_cell.CellX(), new_cell.CellY());
             return;
@@ -1485,7 +1485,7 @@ bool Map::CreatureCellRelocation(Creature* c, const Cell& new_cell)
     Cell const& old_cell = c->GetCurrentCell();
     if (old_cell.DiffGrid(new_cell))
     {
-        if (!c->isActiveObject() && !loaded(new_cell.gridPair()))
+        if ((!c->isActiveObject() || m_isUnloading) && !loaded(new_cell.gridPair()))
         {
             DEBUG_FILTER_LOG(LOG_FILTER_CREATURE_MOVES, "Creature (GUID: %u Entry: %u) attempt move from grid[%u,%u]cell[%u,%u] to unloaded grid[%u,%u]cell[%u,%u].", c->GetGUIDLow(), c->GetEntry(), old_cell.GridX(), old_cell.GridY(), old_cell.CellX(), old_cell.CellY(), new_cell.GridX(), new_cell.GridY(), new_cell.CellX(), new_cell.CellY());
             return false;
@@ -1583,6 +1583,11 @@ bool Map::UnloadGrid(const uint32& x, const uint32& y, bool pForce)
 
 void Map::UnloadAll(bool pForce)
 {
+    // teardown: respawn relocations must never force-load a grid from here on
+    // (BattleGroundMap crash: GameObject::Create inside UnloadAll when an
+    // active creature's respawn cell sat in an unloaded grid)
+    m_isUnloading = true;
+
     for (GridRefManager<NGridType>::iterator i = GridRefManager<NGridType>::begin(); i != GridRefManager<NGridType>::end();)
     {
         NGridType& grid(*i->getSource());

@@ -2012,7 +2012,9 @@ void GameObject::Use(Unit* user, SpellEntry const* spellInfo)
             spellId = info->spellcaster.spellId;
             spellCaster = this;
 
-            onSuccess = [&]()
+            // capture by value: info is scoped to this case block, but the lambda runs
+            // after the switch — a by-reference capture dangles once the block ends
+            onSuccess = [this, info]()
             {
                 AddUse();
 

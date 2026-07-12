@@ -492,7 +492,20 @@ void WorldSession::HandleBattlefieldPortOpcode(WorldPacket& recv_data)
         GroupQueueInfo queueInfo;
         if (!queueItem.GetPlayerGroupInfoData(playerGuid, &queueInfo))
         {
-            sLog.outError("BattlegroundHandler: itrplayerstatus not found.");
+            sLog.outError("BattlegroundHandler: itrplayerstatus not found for %s (queue %u, action %u).",
+                          playerGuid.GetString().c_str(), uint32(bgQueueTypeId), uint32(action));
+            // the queue no longer knows this player but they still hold a queue slot:
+            // clear the stale slot so they don't retry this dead entry forever
+            sWorld.GetMessager().AddMessage([playerGuid, bgQueueTypeId, queueSlot, bgTypeId](World* /*world*/)
+            {
+                if (Player* player = sObjectMgr.GetPlayer(playerGuid))
+                {
+                    player->RemoveBattleGroundQueueId(bgQueueTypeId);
+                    WorldPacket data;
+                    sBattleGroundMgr.BuildBattleGroundStatusPacket(data, true, bgTypeId, 0, false, 0, queueSlot, STATUS_NONE, 0, 0, ARENA_TYPE_NONE, TEAM_NONE, 0, 0);
+                    player->GetSession()->SendPacket(data);
+                }
+            });
             return;
         }
 
@@ -528,28 +541,44 @@ void WorldSession::HandleBattlefieldPortOpcode(WorldPacket& recv_data)
             case 1:                                         // port to battleground
             {
                 BattleGroundInQueueInfo* bgInQueue = queue->GetFreeSlotInstance(bgTypeId, queueInfo.isInvitedToBgInstanceGuid);
-                MANGOS_ASSERT(bgInQueue); // at this point must always exist
+                if (!bgInQueue && bgTypeId == BATTLEGROUND_AA)
+                {
+                    // arena port requests may carry the generic AA type (playerbots do this)
+                    // while the created instance is registered under its concrete arena type
+                    for (BattleGroundTypeId concreteType : { BATTLEGROUND_NA, BATTLEGROUND_BE, BATTLEGROUND_RL, BATTLEGROUND_DS, BATTLEGROUND_RV })
+                        if ((bgInQueue = queue->GetFreeSlotInstance(concreteType, queueInfo.isInvitedToBgInstanceGuid)) != nullptr)
+                            break;
+                }
+                if (!bgInQueue)
+                {
+                    // never abort the server on unexpected client input
+                    sLog.outError("BattlegroundHandler: invited instance %u not found for type %u, ignoring port request.",
+                                  queueInfo.isInvitedToBgInstanceGuid, uint32(bgTypeId));
+                    return;
+                }
 
                 // remove battleground queue status from BGmgr
                 queueItem.RemovePlayer(*queue, playerGuid, false);
 
-                sWorld.GetMessager().AddMessage([playerGuid, invitedTo = queueInfo.isInvitedToBgInstanceGuid, bgTypeId, bgQueueTypeId, groupTeam = queueInfo.groupTeam, queueSlot, bgClientInstanceId = bgInQueue->GetClientInstanceId(), isRated = bgInQueue->IsRated(), mapId = bgInQueue->GetMapId(), arenaType = bgInQueue->GetArenaType(), minLevel = bgInQueue->minLevel, maxLevel = bgInQueue->maxLevel](World* /*world*/)
+                sWorld.GetMessager().AddMessage([playerGuid, invitedTo = queueInfo.isInvitedToBgInstanceGuid, bgTypeId = bgInQueue->GetTypeId(), bgQueueTypeId, groupTeam = queueInfo.groupTeam, queueSlot, bgClientInstanceId = bgInQueue->GetClientInstanceId(), isRated = bgInQueue->IsRated(), mapId = bgInQueue->GetMapId(), arenaType = bgInQueue->GetArenaType(), minLevel = bgInQueue->minLevel, maxLevel = bgInQueue->maxLevel](World* /*world*/)
                 {
-                    Player* player = sObjectMgr.GetPlayer(playerGuid);
+                    // include mid-teleport/out-of-world players: their queue entry is already
+                    // removed, so dropping the port here would strand them (2v1 arena matches)
+                    Player* player = sObjectMgr.GetPlayer(playerGuid, false);
                     if (!player)
                         return;
 
+                    bool canPortNow = player->IsInWorld() && !player->IsBeingTeleported();
+
                     // resurrect the player
-                    if (!player->IsAlive())
+                    if (canPortNow && !player->IsAlive())
                     {
                         player->ResurrectPlayer(1.0f);
                         player->SpawnCorpseBones();
                     }
 
-                    if (!player->InBattleGround())
-                        player->SetBattleGroundEntryPoint();
-
-                    player->TaxiFlightInterrupt();
+                    if (canPortNow)
+                        player->TaxiFlightInterrupt();
 
                     uint32 startTime = 0;
                     if (BattleGround* bg = sBattleGroundMgr.GetBattleGround(invitedTo, bgTypeId))
@@ -561,15 +590,28 @@ void WorldSession::HandleBattlefieldPortOpcode(WorldPacket& recv_data)
 
                     // this is still needed here if battleground "jumping" shouldn't add deserter debuff
                     // also this is required to prevent stuck at old battleground after SetBattleGroundId set to new
-                    if (BattleGround* currentBg = player->GetBattleGround())
-                        currentBg->RemovePlayerAtLeave(player->GetObjectGuid(), false, true);
+                    // NB GetBattleGround() derefs the player's map: only legal in world
+                    if (canPortNow)
+                        if (BattleGround* currentBg = player->GetBattleGround())
+                            currentBg->RemovePlayerAtLeave(player->GetObjectGuid(), false, true);
 
                     // set the destination instance id
                     player->SetBattleGroundId(invitedTo, bgTypeId);
                     // set the destination team
                     player->SetBGTeam(groupTeam);
 
-                    sBattleGroundMgr.SendToBattleGround(player, invitedTo, bgTypeId);
+                    // a relog between queue join and port accept loses the in-memory entry
+                    // point; recapture it now (falls back to homebind when out of world) or
+                    // leaving the match teleports this player to the uninitialized origin
+                    if (!player->HasValidBattleGroundEntryPoint())
+                        player->SetBattleGroundEntryPoint();
+
+                    if (canPortNow)
+                        sBattleGroundMgr.SendToBattleGround(player, invitedTo, bgTypeId);
+                    else
+                        // mid-teleport (e.g. a bot that just left its previous battleground):
+                        // finish the port once the pending teleport is acknowledged
+                        player->ScheduleDelayedOperation(DELAYED_BG_TELEPORT);
 
                     DEBUG_LOG("Battleground: player %s (%u) joined battle for bg %u, bgtype %u, queue type %u.", player->GetName(), player->GetGUIDLow(), invitedTo, bgTypeId, bgQueueTypeId);
                 });

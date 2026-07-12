@@ -519,6 +519,7 @@ ChatCommand* ChatHandler::getCommandTable()
         { "morph",          SEC_GAMEMASTER,     false, &ChatHandler::HandleModifyMorphCommand,         "", nullptr },
         { "phase",          SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyPhaseCommand,         "", nullptr },
         { "gender",         SEC_GAMEMASTER,     false, &ChatHandler::HandleModifyGenderCommand,        "", nullptr },
+        { "appearance",     SEC_GAMEMASTER,     false, &ChatHandler::HandleModifyAppearanceCommand,    "", nullptr },
         { "strength",       SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyStrengthCommand,      "", nullptr },
         { "agility",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyAgilityCommand,       "", nullptr },
         { "stamina",        SEC_ADMINISTRATOR,  false, &ChatHandler::HandleModifyStaminaCommand,       "", nullptr },

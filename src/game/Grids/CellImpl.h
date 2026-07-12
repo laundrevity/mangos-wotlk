@@ -87,6 +87,16 @@ Cell::Visit(const CellPair& standing_cell, TypeContainerVisitor<T, CONTAINER>& v
 
     CellPair& begin_cell = area.low_bound;
     CellPair& end_cell = area.high_bound;
+
+    // corrupted object coordinates (e.g. a unit far outside the map) can yield a
+    // degenerate or inverted area whose traversal below never terminates
+    if (begin_cell.x_coord > end_cell.x_coord || begin_cell.y_coord > end_cell.y_coord ||
+            end_cell.x_coord >= TOTAL_NUMBER_OF_CELLS_PER_MAP || end_cell.y_coord >= TOTAL_NUMBER_OF_CELLS_PER_MAP)
+    {
+        sLog.outError("Cell::Visit: invalid cell area [%u:%u]..[%u:%u] for pos (%f, %f) r=%f, skipping visit",
+                      begin_cell.x_coord, begin_cell.y_coord, end_cell.x_coord, end_cell.y_coord, x, y, radius);
+        return;
+    }
     // visit all cells, found in CalculateCellArea()
     // if radius is known to reach cell area more than 4x4 then we should call optimized VisitCircle
     // currently this technique works with MAX_NUMBER_OF_CELLS 16 and higher, with lower values
@@ -150,7 +160,10 @@ Cell::VisitCircle(TypeContainerVisitor<T, CONTAINER>& visitor, Map& m, const Cel
     // now we are visiting borders of an octagon...
     for (uint32 step = 1; step <= (x_start - begin_cell.x_coord); ++step)
     {
-        // each step reduces strip height by 2 cells...
+        // each step reduces strip height by 2 cells; stop before the unsigned
+        // coords underflow/invert (would wrap and loop ~2^32 times)
+        if (y_start == 0 || y_start - 1 < y_end + 1)
+            break;
         y_end += 1;
         y_start -= 1;
         for (uint32 y = y_start; y >= y_end; --y)

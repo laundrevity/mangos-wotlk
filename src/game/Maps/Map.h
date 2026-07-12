@@ -203,6 +203,7 @@ class Map : public GridRefManager<NGridType>
         void ForceLoadGrid(float x, float y);
         bool UnloadGrid(const uint32& x, const uint32& y, bool pForce);
         virtual void UnloadAll(bool pForce);
+        bool IsUnloading() const { return m_isUnloading; }
 
         void ResetGridExpiry(NGridType& grid, float factor = 1) const
         {
@@ -562,6 +563,7 @@ class Map : public GridRefManager<NGridType>
         // Shared geodata object with map coord info...
         TerrainInfo* const m_TerrainData;
         bool m_bLoadedGrids[MAX_NUMBER_OF_GRIDS][MAX_NUMBER_OF_GRIDS];
+        bool m_isUnloading = false;             // set once by UnloadAll: no grid may load during teardown
 
         std::bitset<TOTAL_NUMBER_OF_CELLS_PER_MAP* TOTAL_NUMBER_OF_CELLS_PER_MAP> marked_cells;
 

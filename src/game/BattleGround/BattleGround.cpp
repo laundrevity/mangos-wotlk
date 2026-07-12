@@ -229,6 +229,7 @@ BattleGround::BattleGround(): m_buffChange(false), m_startDelayTime(0), m_arenaB
     m_winner            = WINNER_NONE;
     m_startTime         = 0;
     m_validStartPositionTimer = 0;
+    m_arenaBoundsCheckTimer = 0;
     m_events            = 0;
     m_isRated           = false;
     m_isRandom          = false;
@@ -387,6 +388,50 @@ void BattleGround::Update(uint32 diff)
             SpawnEvent(ARENA_BUFF_EVENT, 0, true);
             m_arenaBuffSpawned = true;
         }
+    }
+
+    /*********************************************************/
+    /***           ARENA OUT-OF-BOUNDS GUARD               ***/
+    /*********************************************************/
+
+    // physics/pathing bugs (charge through geometry, corrupted splines) can fling
+    // a player far off the arena platform where opponents can never reach them,
+    // deadlocking the match: pull anyone too far from both start gates back in
+    if (IsArena() && GetStatus() == STATUS_IN_PROGRESS)
+    {
+        if (m_arenaBoundsCheckTimer < diff)
+        {
+            m_arenaBoundsCheckTimer = ARENA_BOUNDS_CHECK_INTERVAL;
+
+            float ax, ay, az, ao, hx, hy, hz, ho;
+            GetTeamStartLoc(ALLIANCE, ax, ay, az, ao);
+            GetTeamStartLoc(HORDE, hx, hy, hz, ho);
+
+            for (const auto& itr : GetPlayers())
+            {
+                if (Player* player = sObjectMgr.GetPlayer(itr.first))
+                {
+                    if (!player->IsAlive() || player->IsBeingTeleported() || player->IsGameMaster())
+                        continue;
+
+                    if (player->GetDistance(ax, ay, az) > ARENA_MAX_DIST_FROM_START
+                        && player->GetDistance(hx, hy, hz) > ARENA_MAX_DIST_FROM_START)
+                    {
+                        Team team = player->GetBGTeam();
+                        if (team == 0)
+                            team = player->GetTeam();
+
+                        float x, y, z, o;
+                        GetTeamStartLoc(team, x, y, z, o);
+                        sLog.outError("Arena: %s escaped the arena bounds on map %u (%.1f %.1f %.1f), teleporting back to start location.",
+                                      player->GetName(), GetMapId(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+                        player->TeleportTo(GetMapId(), x, y, z, o);
+                    }
+                }
+            }
+        }
+        else
+            m_arenaBoundsCheckTimer -= diff;
     }
 
     /*********************************************************/
