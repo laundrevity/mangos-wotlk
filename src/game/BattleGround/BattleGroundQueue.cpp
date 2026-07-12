@@ -955,7 +955,9 @@ void BattleGroundQueueItem::Update(BattleGroundQueue& queue, BattleGroundTypeId 
 
     auto pickRandomArena = [&](BattleGroundTypeId& bgTypeId, BattleGround*& bgTemplate)
     {
-        BattleGroundTypeId arenas[] = { BATTLEGROUND_NA, BATTLEGROUND_BE, BATTLEGROUND_RL, BATTLEGROUND_DS, BATTLEGROUND_RV };
+        // Ring of Valor removed from the rotation: its start elevators strand
+        // every participant under the arena floor (known-broken; local call)
+        BattleGroundTypeId arenas[] = { BATTLEGROUND_NA, BATTLEGROUND_BE, BATTLEGROUND_RL, BATTLEGROUND_DS };
         bgTypeId = arenas[urand(0, countof(arenas) - 1)];
         bgTemplate = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
         if (!bgTemplate)
