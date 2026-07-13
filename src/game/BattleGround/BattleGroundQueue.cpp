@@ -528,7 +528,13 @@ bool BattleGroundQueueItem::InviteGroupToBg(GroupQueueInfo& groupInfo, BattleGro
                 Player* plr = sObjectMgr.GetPlayer(playerGuid);
                 // if offline, skip him, can happen due to asynchronicity now
                 if (!plr)
+                {
+                    // a skipped player receives no invite AND no timeout events —
+                    // his group entry can linger in queue as a phantom. Loud log.
+                    sLog.outError("BattleGround: invite for %s (queue %u, instance %u) undeliverable — player unresolvable",
+                                  playerGuid.GetString().c_str(), uint32(bgQueueTypeId), instanceId);
                     return;
+                }
 
                 plr->SetInviteForBattleGroundQueueType(bgQueueTypeId, isInvited);
 
@@ -1212,6 +1218,20 @@ void BattleGroundQueueItem::Update(BattleGroundQueue& queue, BattleGroundTypeId 
                 m_queuedGroups[bracketId][BG_QUEUE_PREMADE_HORDE].push_front(secondGroup);
                 m_queuedGroups[bracketId][BG_QUEUE_PREMADE_ALLIANCE].erase(itr_team[TEAM_INDEX_HORDE]);
                 itr_team[TEAM_INDEX_HORDE] = m_queuedGroups[bracketId][BG_QUEUE_PREMADE_HORDE].begin();
+            }
+
+            // rated matches are rare and were historically haunted by phantom
+            // queue entries — log both rosters at creation, always
+            {
+                std::string roster[2];
+                GroupQueueInfo* sides[2] = { firstGroup, secondGroup };
+                for (int s = 0; s < 2; ++s)
+                    for (auto const& p : sides[s]->players)
+                        roster[s] += p.first.GetString() + " ";
+                sLog.outBasic("RatedArena: instance %u (%uv%u) team %u [%s] vs team %u [%s]",
+                              bgInfo.instanceId, uint32(arenaType), uint32(arenaType),
+                              firstGroup->arenaTeamId, roster[0].c_str(),
+                              secondGroup->arenaTeamId, roster[1].c_str());
             }
 
             InviteGroupToBg(*firstGroup, bgInfo, ALLIANCE);
