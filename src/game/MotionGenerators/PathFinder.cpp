@@ -130,6 +130,13 @@ bool PathFinder::calculate(Vector3 const& start, Vector3 const& dest, bool force
     if (!MaNGOS::IsValidMapCoord(start.x, start.y, start.z))
         return false;
 
+    // bot travel actions can request paths for a unit mid-teleport: its
+    // m_currMap is detached and the terrain queries inside BuildPolyPath
+    // hit the GetMap() integrity assert ("GetMap(): m_currMap" server
+    // abort, observed 2026-07-15). No map, no path.
+    if (m_sourceUnit && !m_sourceUnit->IsInWorld())
+        return false;
+
 #ifndef ENABLE_PLAYERBOTS
     if (!m_sourceUnit)
         return false;
