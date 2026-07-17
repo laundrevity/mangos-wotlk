@@ -3642,8 +3642,9 @@ SpellAuraProcResult Unit::HandleProcTriggerSpellAuraProc(ProcExecutionData& data
                         !((Player*)this)->IsBaseRuneSlotsOnCooldown(RUNE_BLOOD))
                     return SPELL_AURA_PROC_FAILED;
             }
-            // Improved Blood Presence
-            else if (auraSpellInfo->Id == 63611)
+            // Improved Blood Presence (63611) and custom item leech "Little Hunger" (51019):
+            // heal for aura-basepoints% of damage dealt
+            else if (auraSpellInfo->Id == 63611 || auraSpellInfo->Id == 51019)
             {
                 if (GetTypeId() != TYPEID_PLAYER || !((Player*)this)->isHonorOrXPTarget(pVictim) || !damage)
                     return SPELL_AURA_PROC_FAILED;
