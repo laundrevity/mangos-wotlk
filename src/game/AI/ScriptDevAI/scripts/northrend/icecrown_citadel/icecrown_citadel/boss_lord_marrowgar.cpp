@@ -388,6 +388,14 @@ struct spell_bone_spike_graveyard : public SpellScript
         if (!target || !target->IsPlayer())
             return;
 
+        // Bone Spike never impales the main tank (retail behavior); with a lone player
+        // (victim can be briefly null during Bone Storm) an impale is an unbreakable death
+        if (target->GetMap()->GetPlayersCountExceptGMs() <= 1)
+            return;
+        if (Unit* caster = spell->GetAffectiveCaster())
+            if (caster->GetVictim() == target)
+                return;
+
         // check for aura 69065
         uint32 spellId = spell->m_spellInfo->CalculateSimpleValue(EFFECT_INDEX_1);
 
@@ -410,6 +418,13 @@ struct spell_bone_spike_graveyard_storm : public SpellScript
         Unit* target = spell->GetUnitTarget();
         if (!target || !target->IsPlayer() || target->HasAura(69065))
             return;
+
+        // same main-tank + lone-player exclusion as the normal-phase graveyard
+        if (target->GetMap()->GetPlayersCountExceptGMs() <= 1)
+            return;
+        if (Unit* caster = spell->GetAffectiveCaster())
+            if (caster->GetVictim() == target)
+                return;
 
         // Note: it's not 100% clear if the following logic is correct; this is an intelligent guess
         uint32 spellId = 0;
