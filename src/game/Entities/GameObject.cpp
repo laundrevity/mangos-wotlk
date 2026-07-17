@@ -545,7 +545,9 @@ void GameObject::Update(const uint32 diff)
             {
                 case GAMEOBJECT_TYPE_DOOR:
                 case GAMEOBJECT_TYPE_BUTTON:
-                    if (GetGOInfo()->GetAutoCloseTime() && (m_cooldownTime < time(nullptr)))
+                    // m_cooldownTime == 0 = spawned in startOpen state, never used: must not auto-close
+                    // (ICC "Icecrown Raid Exit" 201583: startOpen + 10s autoCloseTime shut the raid entrance at grid load)
+                    if (GetGOInfo()->GetAutoCloseTime() && m_cooldownTime && (m_cooldownTime < time(nullptr)))
                         ResetDoorOrButton();
                     break;
                 case GAMEOBJECT_TYPE_CHEST:
