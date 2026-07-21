@@ -1389,10 +1389,13 @@ GridMap* TerrainInfo::LoadMapAndVMap(const uint32 x, const uint32 y, bool mapOnl
         }
     }
 
-    if (m_GridMaps[x][y])
-        m_GridMaps[x][y]->SetFullyLoaded();
+    if (GridMap* pMap = m_GridMaps[x][y])
+    {
+        pMap->SetFullyLoaded();
+        return pMap;
+    }
 
-    return  m_GridMaps[x][y];
+    return nullptr;
 }
 
 float TerrainInfo::GetWaterLevel(float x, float y, float z, float* pGround /*= nullptr*/) const

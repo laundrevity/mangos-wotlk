@@ -194,8 +194,11 @@ class TerrainInfo : public Referencable<std::atomic_long>
 
         const uint32 m_mapId;
 
-        GridMap* m_GridMaps[MAX_NUMBER_OF_GRIDS][MAX_NUMBER_OF_GRIDS];
-        bool m_GridMapsLoadAttempted[MAX_NUMBER_OF_GRIDS][MAX_NUMBER_OF_GRIDS];
+        // atomic: read lock-free from many map-update threads (playerbot terrain queries)
+        // while LoadMapAndVMap publishes under the mutex; a plain pointer store lets ARM
+        // reorder the publish ahead of the GridMap's contents (observed null m_gridGetHeight)
+        std::atomic<GridMap*> m_GridMaps[MAX_NUMBER_OF_GRIDS][MAX_NUMBER_OF_GRIDS];
+        std::atomic<bool> m_GridMapsLoadAttempted[MAX_NUMBER_OF_GRIDS][MAX_NUMBER_OF_GRIDS];
         int16 m_GridRef[MAX_NUMBER_OF_GRIDS][MAX_NUMBER_OF_GRIDS];
 
         // global garbage collection timer
