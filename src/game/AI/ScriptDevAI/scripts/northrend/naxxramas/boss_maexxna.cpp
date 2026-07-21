@@ -233,7 +233,10 @@ struct WebWrapMaexxna : public SpellScript
         std::vector<Unit*> unitList;
         spell->GetCaster()->SelectAttackingTargets(unitList, ATTACKING_TARGET_ALL_SUITABLE, 1, nullptr, SELECT_FLAG_PLAYER | SELECT_FLAG_SKIP_TANK);
         std::shuffle(unitList.begin(), unitList.end(), *GetRandomGenerator());
-        unitList.resize(targetCount);
+        // resize must only ever shrink: growing pads with nullptrs and the cast below
+        // segfaults (guaranteed on a solo run, where skipping the tank empties the list)
+        if (unitList.size() > targetCount)
+            unitList.resize(targetCount);
         for (Unit* target : unitList)
         {
             uint32 spellId = targetSpells[urand(0, targetSpells.size() - 1)];
