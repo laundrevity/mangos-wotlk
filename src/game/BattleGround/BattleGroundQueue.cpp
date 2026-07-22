@@ -965,7 +965,13 @@ void BattleGroundQueueItem::Update(BattleGroundQueue& queue, BattleGroundTypeId 
         // strand everyone under the floor, DS needs a jump-down from the start
         // pipes that bot pathing won't take. TBC-proven trio until fixed.
         BattleGroundTypeId arenas[] = { BATTLEGROUND_NA, BATTLEGROUND_BE, BATTLEGROUND_RL };
-        bgTypeId = arenas[urand(0, countof(arenas) - 1)];
+        // no back-to-back repeats: a uniform draw still produces streaks that
+        // read as "always the same map" in an active session
+        static BattleGroundTypeId lastArena = BATTLEGROUND_TYPE_NONE;
+        do
+            bgTypeId = arenas[urand(0, countof(arenas) - 1)];
+        while (bgTypeId == lastArena);
+        lastArena = bgTypeId;
         bgTemplate = sBattleGroundMgr.GetBattleGroundTemplate(bgTypeId);
         if (!bgTemplate)
             sLog.outError("BattleGround: CreateNewBattleGround - bg template not found for %u", bgTypeId);
