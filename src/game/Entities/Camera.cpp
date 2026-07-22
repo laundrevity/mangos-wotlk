@@ -159,6 +159,18 @@ void Camera::UpdateVisibilityForOwner(UpdateDataMapType& update_players)
 
 void Camera::UpdateVisibilityForOwner(bool addToWorld, UpdateData& data)
 {
+    // a viewpoint can leave the world (despawning farsight target / camera-ride
+    // object) before the camera resets; visiting from it aborts on the map thread
+    // via GetMap()'s assert (observed 2026-07-22 in the DK starting zone)
+    if (!m_source || !m_source->IsInWorld())
+    {
+        sLog.outError("Camera::UpdateVisibilityForOwner: viewpoint %s not in world, resetting view for %s",
+                      m_source ? m_source->GetGuidStr().c_str() : "<null>", m_owner.GetGuidStr().c_str());
+        if (m_source != &m_owner)
+            ResetView();
+        return;
+    }
+
     m_sendInProgress = true;
     MaNGOS::VisibleNotifier notifier(*this, data, !addToWorld);
     Cell::VisitAllObjects(m_source, notifier, addToWorld ? MAX_VISIBILITY_DISTANCE : m_source->GetVisibilityData().GetVisibilityDistance(), false);
