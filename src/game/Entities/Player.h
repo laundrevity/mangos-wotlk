@@ -2867,8 +2867,6 @@ class Player : public Unit
 
         // transmog overrides (cosmetic; never persisted): slot -> shown item entry
         std::map<uint8, uint32> m_transmogOverrides;
-        // language spells taught for the disguise's fake race
-        std::vector<uint32> m_grantedLangSpells;
 
         uint32 m_zoneUpdateId;
         uint32 m_zoneUpdateTimer;

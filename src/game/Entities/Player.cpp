@@ -20590,14 +20590,15 @@ void Player::SetAppearanceOverride(uint8 race, uint8 gender)
     // doesn't know — server-side fallbacks never see the message. The
     // default chat tongue is the fake race's FACTION language (Orcish /
     // Common), not its racial one, so a cross-faction disguise needs both.
+    // Grants are PERMANENT on purpose: the client only rebuilds its known-
+    // language list at login, so the languages must be in the login
+    // snapshot — first-ever morph on a character needs one relog, after
+    // which every morph speaks immediately.
     uint32 const factionTongue = (race == RACE_ORC || race == RACE_UNDEAD || race == RACE_TAUREN ||
                                   race == RACE_TROLL || race == RACE_BLOODELF) ? 669u : 668u;
     for (uint32 langSpell : { factionTongue, NativeLanguageSpell(race) })
         if (langSpell && !HasSpell(langSpell))
-        {
             learnSpell(langSpell, false);
-            m_grantedLangSpells.push_back(langSpell);
-        }
 }
 
 uint32 Player::NativeLanguageSpell(uint8 race)
@@ -20629,9 +20630,6 @@ void Player::ClearAppearanceOverride()
     SetUInt32Value(PLAYER_BYTES, m_trueBytes);
     SetUInt32Value(PLAYER_BYTES_2, m_trueBytes2);
     m_appearanceOverride = false;
-    for (uint32 langSpell : m_grantedLangSpells)
-        removeSpell(langSpell);
-    m_grantedLangSpells.clear();
     InitDisplayIds();
 }
 
